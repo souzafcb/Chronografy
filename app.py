@@ -55,7 +55,7 @@ def download_street_view_image(lat, lng, heading=0, pitch=0, year=None):
         img = Image.open(BytesIO(response.content)).convert("RGB")
         draw = ImageDraw.Draw(img)
         try:
-            font = ImageFont.truetype("arial.ttf", 48)
+            font = ImageFont.truetype("arial.ttf", 60)
         except:
             font = ImageFont.load_default()
         if year:
@@ -85,7 +85,7 @@ def generate_gif_from_address(address):
 
     if image_files:
         images = [imageio.imread(img_file) for img_file in image_files]
-        imageio.mimsave(GIF_OUTPUT, images, duration=0.04, loop=0)  # 20 segundos por imagem, loop contínuo
+        imageio.mimsave(GIF_OUTPUT, images, duration=200, loop=0)  # 20 segundos por imagem, loop contínuo
         return GIF_OUTPUT
     else:
         st.warning("Não foi possível gerar imagens variadas suficientes para um GIF.")
