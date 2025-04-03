@@ -85,7 +85,7 @@ def generate_gif_from_address(address):
 
     if image_files:
         images = [imageio.imread(img_file) for img_file in image_files]
-        imageio.mimsave(GIF_OUTPUT, images, duration=6.0, loop=0)  # 6 segundos por imagem, loop contínuo
+        imageio.mimsave(GIF_OUTPUT, images, duration=20.0, loop=0)  # 20 segundos por imagem, loop contínuo
         return GIF_OUTPUT
     else:
         st.warning("Não foi possível gerar imagens variadas suficientes para um GIF.")
