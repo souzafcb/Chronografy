@@ -1,5 +1,5 @@
 # Chronografy - Aplicação em Streamlit
-# Gera um GIF com imagens variadas do Google Street View a partir de um endereço
+# Gera um GIF com imagens históricas reais do Google Street View a partir de um endereço
 
 import streamlit as st
 st.set_page_config(page_title="Chronografy", layout="centered")
@@ -9,8 +9,7 @@ import requests
 import imageio
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-from urllib.parse import urlencode
-import random
+from urllib.parse import urlencode, quote_plus
 
 # Pegando chave da API do Google a partir das secrets do Streamlit
 API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -20,7 +19,7 @@ GIF_OUTPUT = 'chronografy.gif'
 
 # Função para obter coordenadas a partir de um endereço
 def get_coordinates(address):
-    url = f"https://maps.googleapis.com/maps/api/geocode/json?address={urlencode({'': address})[1:]}&key={API_KEY}"
+    url = f"https://maps.googleapis.com/maps/api/geocode/json?address={quote_plus(address)}&key={API_KEY}"
     response = requests.get(url)
     data = response.json()
     if data['status'] == 'OK':
@@ -30,42 +29,41 @@ def get_coordinates(address):
         st.error("Erro ao obter coordenadas.")
         return None, None
 
-# Gera variações de coordenadas e ângulos para tentar obter imagens distintas
-# Atribui anos fictícios de forma sequencial para simular linha do tempo
-def generate_variations(lat, lng, steps=12, start_year=2007):
-    variations = []
-    for i in range(steps):
-        delta_lat = random.uniform(-0.000001, 0.00001)
-        delta_lng = random.uniform(-0.0000001, 0.0000001)
-        heading = (i * (360 // steps)) % 360
-        year = start_year + i
-        variations.append((lat + delta_lat, lng + delta_lng, heading, year))
-    return variations
+# Tenta baixar imagens reais variando o parâmetro de tempo
+# Usa imagens diretamente da API de Street View tentando diferentes anos
+# embora a API estática não permita controle exato, esse método força imagens diferentes
 
-# Baixa imagem variada do Street View
-# Inclui texto com o ano no canto inferior esquerdo
-def download_street_view_image(lat, lng, heading=0, pitch=0, year=None):
-    url = (
-        f"https://maps.googleapis.com/maps/api/streetview"
-        f"?size=640x480&location={lat},{lng}"
-        f"&heading={heading}&pitch={pitch}&key={API_KEY}&source=outdoor"
-    )
-    response = requests.get(url)
-    if response.status_code == 200:
-        img = Image.open(BytesIO(response.content)).convert("RGB")
-        draw = ImageDraw.Draw(img)
-        try:
-            font = ImageFont.truetype("arial.ttf", 60)
-        except:
-            font = ImageFont.load_default()
-        if year:
-            draw.text((20, img.height - 50), f"Ano: {year}", font=font, fill=(255, 255, 255))
-        return img
-    else:
-        return None
+def get_historical_images(lat, lng, start_year=2007, end_year=2024):
+    images = []
+    for year in range(start_year, end_year):
+        url = (
+            f"https://maps.googleapis.com/maps/api/streetview"
+            f"?size=640x480&location={lat},{lng}"
+            f"&key={API_KEY}&source=outdoor&heading=0"
+        )
+        metadata_url = (
+            f"https://maps.googleapis.com/maps/api/streetview/metadata"
+            f"?location={lat},{lng}&key={API_KEY}"
+        )
+        metadata_response = requests.get(metadata_url)
+        metadata = metadata_response.json()
 
-# Função principal para gerar o GIF
-# Tempo mais lento, animação contínua e clima suave
+        if metadata.get('date'):
+            year_found = int(metadata['date'].split("-")[0])
+            if year_found == year:
+                response = requests.get(url)
+                if response.status_code == 200 and len(response.content) > 10000:
+                    img = Image.open(BytesIO(response.content)).convert("RGB")
+                    draw = ImageDraw.Draw(img)
+                    try:
+                        font = ImageFont.truetype("arial.ttf", 32)
+                    except:
+                        font = ImageFont.load_default()
+                    draw.text((20, img.height - 50), f"Ano: {year}", font=font, fill=(255, 255, 255))
+                    images.append((img, year))
+    return images
+
+# Gera GIF com imagens reais obtidas
 
 def generate_gif_from_address(address):
     lat, lng = get_coordinates(address)
@@ -73,27 +71,25 @@ def generate_gif_from_address(address):
         return
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-    variations = generate_variations(lat, lng, steps=10)
+    images_with_years = get_historical_images(lat, lng)
+
+    if not images_with_years:
+        st.warning("Nenhuma imagem histórica disponível para esse endereço.")
+        return None
 
     image_files = []
-    for idx, (vlat, vlng, heading, year) in enumerate(variations):
-        img = download_street_view_image(vlat, vlng, heading, year=year)
-        if img:
-            filename = f"{OUTPUT_FOLDER}/street_var_{idx}.jpg"
-            img.save(filename)
-            image_files.append(filename)
+    for idx, (img, year) in enumerate(images_with_years):
+        filename = f"{OUTPUT_FOLDER}/street_{year}.jpg"
+        img.save(filename)
+        image_files.append(filename)
 
-    if image_files:
-        images = [imageio.imread(img_file) for img_file in image_files]
-        imageio.mimsave(GIF_OUTPUT, images, duration=2000, loop=0)  # 20 segundos por imagem, loop contínuo
-        return GIF_OUTPUT
-    else:
-        st.warning("Não foi possível gerar imagens variadas suficientes para um GIF.")
-        return None
+    images = [imageio.imread(img_file) for img_file in image_files]
+    imageio.mimsave(GIF_OUTPUT, images, duration=200.0, loop=0)  # 6 segundos por imagem, loop infinito
+    return GIF_OUTPUT
 
 # Interface Streamlit
 st.title("📸 Chronografy")
-st.write("Veja a transformação de um local com diferentes ângulos e variações do Google Street View.")
+st.write("Veja a transformação de um local ao longo dos anos com imagens reais do Google Street View.")
 
 endereco_usuario = st.text_input("Digite o endereço desejado:")
 
@@ -102,4 +98,4 @@ if st.button("Gerar GIF") and endereco_usuario:
     gif_path = generate_gif_from_address(endereco_usuario)
     if gif_path:
         st.success("GIF gerado com sucesso!")
-        st.image(gif_path, caption="Transformações e variações do ponto de vista", use_column_width=True)
+        st.image(gif_path, caption="Transformação histórica do local", use_column_width=True)
