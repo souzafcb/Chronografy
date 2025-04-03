@@ -32,11 +32,11 @@ def get_coordinates(address):
 
 # Gera variações de coordenadas e ângulos para tentar obter imagens distintas
 # Atribui anos fictícios de forma sequencial para simular linha do tempo
-def generate_variations(lat, lng, steps=8, start_year=2007):
+def generate_variations(lat, lng, steps=12, start_year=2007):
     variations = []
     for i in range(steps):
-        delta_lat = random.uniform(-0.00005, 0.00005)
-        delta_lng = random.uniform(-0.00005, 0.00005)
+        delta_lat = random.uniform(-0.000001, 0.00001)
+        delta_lng = random.uniform(-0.0000001, 0.0000001)
         heading = (i * (360 // steps)) % 360
         year = start_year + i
         variations.append((lat + delta_lat, lng + delta_lng, heading, year))
