@@ -1,5 +1,5 @@
-# Chronografy - Aplicação em Streamlit
-# Gera um GIF com imagens variadas do Google Street View a partir de um endereço
+import streamlit as st
+st.set_page_config(page_title="Chronografy", layout="centered")
 
 import os
 import requests
@@ -7,7 +7,6 @@ import imageio
 from io import BytesIO
 from PIL import Image
 from urllib.parse import urlencode
-import streamlit as st
 import random
 
 # Pegando chave da API do Google a partir das secrets do Streamlit
@@ -77,7 +76,6 @@ def generate_gif_from_address(address):
         return None
 
 # Interface Streamlit
-st.set_page_config(page_title="Chronografy", layout="centered")
 st.title("📸 Chronografy")
 st.write("Veja a transformação de um local com diferentes ângulos e variações do Google Street View.")
 
