@@ -8,7 +8,7 @@ import os
 import requests
 import imageio
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from urllib.parse import urlencode
 import random
 
@@ -31,17 +31,20 @@ def get_coordinates(address):
         return None, None
 
 # Gera variações de coordenadas e ângulos para tentar obter imagens distintas
-def generate_variations(lat, lng, steps=8):
+# Atribui anos fictícios de forma sequencial para simular linha do tempo
+def generate_variations(lat, lng, steps=8, start_year=2007):
     variations = []
     for i in range(steps):
         delta_lat = random.uniform(-0.00005, 0.00005)
         delta_lng = random.uniform(-0.00005, 0.00005)
         heading = (i * (360 // steps)) % 360
-        variations.append((lat + delta_lat, lng + delta_lng, heading))
+        year = start_year + i
+        variations.append((lat + delta_lat, lng + delta_lng, heading, year))
     return variations
 
 # Baixa imagem variada do Street View
-def download_street_view_image(lat, lng, heading=0, pitch=0):
+# Inclui texto com o ano no canto inferior esquerdo
+def download_street_view_image(lat, lng, heading=0, pitch=0, year=None):
     url = (
         f"https://maps.googleapis.com/maps/api/streetview"
         f"?size=640x480&location={lat},{lng}"
@@ -49,7 +52,15 @@ def download_street_view_image(lat, lng, heading=0, pitch=0):
     )
     response = requests.get(url)
     if response.status_code == 200:
-        return Image.open(BytesIO(response.content))
+        img = Image.open(BytesIO(response.content)).convert("RGB")
+        draw = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arial.ttf", 24)
+        except:
+            font = ImageFont.load_default()
+        if year:
+            draw.text((10, img.height - 30), f"Ano: {year}", font=font, fill=(255, 255, 255))
+        return img
     else:
         return None
 
@@ -63,8 +74,8 @@ def generate_gif_from_address(address):
     variations = generate_variations(lat, lng)
 
     image_files = []
-    for idx, (vlat, vlng, heading) in enumerate(variations):
-        img = download_street_view_image(vlat, vlng, heading)
+    for idx, (vlat, vlng, heading, year) in enumerate(variations):
+        img = download_street_view_image(vlat, vlng, heading, year=year)
         if img:
             filename = f"{OUTPUT_FOLDER}/street_var_{idx}.jpg"
             img.save(filename)
@@ -72,7 +83,7 @@ def generate_gif_from_address(address):
 
     if image_files:
         images = [imageio.imread(img_file) for img_file in image_files]
-        imageio.mimsave(GIF_OUTPUT, images, duration=1.5)
+        imageio.mimsave(GIF_OUTPUT, images, duration=4.0, loop=0)  # 4 segundos por imagem, loop infinito
         return GIF_OUTPUT
     else:
         st.warning("Não foi possível gerar imagens variadas suficientes para um GIF.")
